@@ -55,7 +55,7 @@ def go():
 
     print(args)
     result = style.artistic_style(content, style_img, m,
-            float(args.get('ratio', '1e1')))
+            float(args.get('ratio', '1e1')), float(args.get('tv_ratio', '10')))
     return '<img src="' + img_to_data_url(result) +'" />'
 
 
@@ -72,16 +72,25 @@ def index():
                 name="content"
                 placeholder="content URL"
                 required/>
+            <br/>
             <input
                 type="text"
                 name="style"
                 placeholder="style URL"
                 required/>
+            <br/>
             <input
                 type="number"
                 name="ratio"
                 placeholder="Loss ratio"
                 value="10"/>
+            <br/>
+            <input
+                type="number"
+                name="tv_ratio"
+                placeholder="Total Variation ratio"
+                value="10"/>
+            <br/>
             <select name="size">
                 <option value="128">128</option>
                 <option value="256">256</option>

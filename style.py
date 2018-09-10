@@ -87,7 +87,7 @@ def npimg_to_tensor(np_img):
     return torch.FloatTensor(np_img / 255).permute(2, 0, 1).cuda()
 
 
-def artistic_style(content_img, style_img, m=None, style_ratio=1e1):
+def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10):
     content_layers = ['21']
     if m is None:
         m = M.vgg19(pretrained=True).cuda().eval()
@@ -134,7 +134,10 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1):
             for j in content_layers:
                 content_loss += F.mse_loss(activations[j], photo_activations[j])
 
-            loss = content_loss + style_ratio * style_loss
+            loss = content_loss
+            loss += style_ratio * style_loss
+            loss += tv_ratio * total_variation(canvas[None])
+
             loss.backward()
             return loss
 

@@ -40,12 +40,8 @@ def img_to_data_url(img):
 def go():
     args = request.args
 
-    if args.get('preview', 'off') == 'on':
-        content_scale = 128
-        style_scale = 128
-    else:
-        content_scale = 512
-        style_scale = 512
+    content_scale = int(args['size'])
+    style_scale = content_scale
 
     if args['content'].startswith('http'):
         content = wget(args['content'], content_scale)
@@ -84,8 +80,15 @@ def index():
             <input
                 type="number"
                 name="ratio"
-                placeholder="Loss ratio" />
-            <input type="checkbox" name="preview" checked/>
+                placeholder="Loss ratio"
+                value="10"/>
+            <select name="size">
+                <option value="128">128</option>
+                <option value="256">256</option>
+                <option value="512">512</option>
+                <option value="720">720</option>
+                <option value="1024">1024</option>
+            </select>
             <input type="submit"/>
         </form>
     </body>

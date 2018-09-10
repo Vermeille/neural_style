@@ -105,7 +105,8 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1):
     grams = {layer_id: gram(layer_data).detach()
              for layer_id, layer_data in style_activations.items()}
 
-    canvas = lowres_noise_like(torch_img)
+    canvas = torch_img.clone()#lowres_noise_like(torch_img)
+    canvas.requires_grad = True
     del torch_img
     del torch_style
     del style_activations
@@ -115,7 +116,7 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1):
             for i, p in photo_activations.items()
             if i in content_layers}
 
-    opt = O.LBFGS([canvas], lr=0.5, history_size=1)
+    opt = O.LBFGS([canvas], lr=0.5, history_size=10)
 
     for i in range(30):
         def make_loss():

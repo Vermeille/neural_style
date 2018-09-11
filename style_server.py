@@ -14,6 +14,24 @@ m = M.vgg19(pretrained=True).cuda().eval()
 m = style.WithSavedActivations(m.features)
 
 
+def rgb2yuv(image):
+    img = image.transpose(2,0,1).reshape(3,-1)
+    luv = np.array([[.299, .587, .114],[-.147, -.288, .436],[.615, -.515, -.1]]).dot(img).reshape((3,image.shape[0],image.shape[1]))
+    return luv.transpose(1,2,0)
+
+
+def rgb2lum(image):
+    img = image.transpose(2,0,1).reshape(3,-1)
+    luv = np.array([[.299, .587, .114]]).dot(img).reshape((1,image.shape[0],image.shape[1]))
+    return luv.transpose(1,2,0)
+
+
+def yuv2rgb(image):
+    img = image.transpose(2,0,1).reshape(3,-1)
+    rgb = np.array([[1, 0, 1.139],[1, -.395, -.580],[1, 2.03, 0]]).dot(img).reshape((3,image.shape[0],image.shape[1]))
+    return rgb.transpose(1,2,0)
+
+
 def wget(url, scale=None):
     r = requests.get(url)
     print(r.status_code)
@@ -53,9 +71,14 @@ def go():
     else:
         style_img = open_img(args['style'], style_scale)
 
-    print(args)
     result = style.artistic_style(content, style_img, m,
             float(args.get('ratio', '1e1')), float(args.get('tv_ratio', '10')))
+
+    if args.get('preserve_colors', 'off') == 'on':
+        content_yuv = rgb2yuv(content)
+        result_lum = rgb2lum(result)
+        content_yuv[:, :, 0] = result_lum[:, :, 0]
+        result = yuv2rgb(content_yuv).astype('uint8')
     return '<img src="' + img_to_data_url(result) +'" />'
 
 
@@ -98,6 +121,9 @@ def index():
                 <option value="720">720</option>
                 <option value="1024">1024</option>
             </select>
+            <br/>
+            Preserve Colors <input type="checkbox" name="preserve_colors" />
+            <br/>
             <input type="submit"/>
         </form>
     </body>

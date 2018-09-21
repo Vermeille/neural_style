@@ -114,12 +114,13 @@ def index():
                 placeholder="Total Variation ratio"
                 value="10"/>
             <br/>
+            Result size:
             <select name="size">
-                <option value="128">128</option>
-                <option value="256">256</option>
-                <option value="512">512</option>
-                <option value="720">720</option>
-                <option value="1024">1024</option>
+                <option value="128">128px</option>
+                <option value="256">256px</option>
+                <option value="512">512px</option>
+                <option value="720">720px</option>
+                <option value="1024">1024px</option>
             </select>
             <br/>
             Preserve Colors <input type="checkbox" name="preserve_colors" />

@@ -9,4 +9,4 @@ features:
   Factors of Neural Artistic Style (still by Gatys)
 - It embeds a web interface based on Flask. _However this is not production
   ready. The server will just not respond while a picture is being computed_.
-  Just host it on your own cloud, and don't give it the link to anyone :)
+  Just host it on your own cloud, and don't give the link to anyone :)

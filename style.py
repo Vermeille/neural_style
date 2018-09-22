@@ -15,6 +15,24 @@ import io
 import argparse
 
 
+def rgb2yuv(image):
+    img = image.transpose(2,0,1).reshape(3,-1)
+    luv = np.array([[.299, .587, .114],[-.147, -.288, .436],[.615, -.515, -.1]]).dot(img).reshape((3,image.shape[0],image.shape[1]))
+    return luv.transpose(1,2,0)
+
+
+def rgb2lum(image):
+    img = image.transpose(2,0,1).reshape(3,-1)
+    luv = np.array([[.299, .587, .114]]).dot(img).reshape((1,image.shape[0],image.shape[1]))
+    return luv.transpose(1,2,0)
+
+
+def yuv2rgb(image):
+    img = image.transpose(2,0,1).reshape(3,-1)
+    rgb = np.array([[1, 0, 1.139],[1, -.395, -.580],[1, 2.03, 0]]).dot(img).reshape((3,image.shape[0],image.shape[1]))
+    return rgb.transpose(1,2,0)
+
+
 def gram(m):
     b, c, h, w = m.shape
     m = m.view(b, c, h * w)
@@ -148,17 +166,44 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
     return (255 * torch.sigmoid(canvas)
             .cpu().detach().numpy().transpose(1, 2, 0)).astype('uint8')
 
+
+def open_img(path, size=None):
+    img = Image.open(path)
+    if size is not None:
+        img.thumbnail((size, size))
+    return np.array(img)
+
+
+def go(args):
+    content_scale = args.size
+    style_scale = content_scale
+
+    content = open_img(args.content, content_scale)
+    style_img = open_img(args.style, style_scale)
+
+    result = artistic_style(content, style_img, None, args.ratio, args.tv_ratio)
+
+    if args.preserve_colors == 'on':
+        content_yuv = rgb2yuv(content)
+        result_lum = rgb2lum(result)
+        content_yuv[:, :, 0] = result_lum[:, :, 0]
+        result = yuv2rgb(content_yuv).astype('uint8')
+
+    return Image.fromarray(result, 'RGB')
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
             description="Implementation of Neural Artistic Style by Gatys")
     parser.add_argument('--content', required=True)
     parser.add_argument('--style', required=True)
     parser.add_argument('--out', required=True)
-    parser.add_argument('--content_scale', type=float)
-    parser.add_argument('--style_scale', type=float)
+    parser.add_argument('--size', type=int)
+    parser.add_argument('--ratio', default=1, type=float)
+    parser.add_argument('--tv_ratio', default=10, type=float)
+    parser.add_argument('--preserve_colors', default='off')
     args = parser.parse_args(sys.argv[1:])
 
-    result = style_from_uris(args)
+    result = go(args)
     result = Image.fromarray(result)
     result.save(args.out)
 

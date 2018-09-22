@@ -79,7 +79,8 @@ class WithSavedActivations:
         else:
             self.activations[name] = output.clone()
 
-    def __call__(self, input):
+    def __call__(self, input, detach):
+        self.detach = detach
         self.activations = {}
         self.model(input)
         return self.activations
@@ -111,12 +112,11 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
         m = M.vgg19(pretrained=True).cuda().eval()
         m = WithSavedActivations(m.features)
 
-    m.detach = True
     torch_img = npimg_to_tensor(content_img)
-    photo_activations = m(normalize(torch_img[None]))
+    photo_activations = m(normalize(torch_img[None]), detach=True)
 
     torch_style = npimg_to_tensor(style_img)
-    style_activations = m(normalize(torch_style[None]))
+    style_activations = m(normalize(torch_style[None]), detach=True)
 
     canvas = torch.randn_like(torch_img, requires_grad=True)
 
@@ -140,9 +140,8 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
         def make_loss():
             gc.collect()
             opt.zero_grad()
-            m.detach = False
             input_img = torch.sigmoid(canvas[None])
-            activations = m(normalize(input_img))
+            activations = m(normalize(input_img), detach=False)
             style_loss = 0
             for j in ['0', '5', '10', '19', '28']:
                 style_loss += 0.2 * F.mse_loss(
@@ -198,12 +197,11 @@ if __name__ == '__main__':
     parser.add_argument('--style', required=True)
     parser.add_argument('--out', required=True)
     parser.add_argument('--size', type=int)
-    parser.add_argument('--ratio', default=1, type=float)
+    parser.add_argument('--ratio', default=1e3, type=float)
     parser.add_argument('--tv_ratio', default=10, type=float)
     parser.add_argument('--preserve_colors', default='off')
     args = parser.parse_args(sys.argv[1:])
 
     result = go(args)
-    result = Image.fromarray(result)
     result.save(args.out)
 

@@ -14,6 +14,29 @@ import torch.optim as O
 import io
 import argparse
 
+try:
+    import limpid.optvis.param as P
+    print('limpid detected')
+
+    def get_parameterized_img(torch_img):
+        canvas = P.SpectralImage((3, torch_img.shape[1], torch_img.shape[2]))
+        canvas = P.DecorrelatedColors(canvas, sigmoid=True).cuda()
+        return canvas
+except:
+    class SimpleImg:
+        def __init__(self, img):
+            self.img = img[None]
+            self.img.requires_grad = True
+
+        def __call__(self):
+            return self.img
+
+        def parameters(self):
+            return [self.img]
+
+    def get_parameterized_img(torch_img):
+        return SimpleImg(torch_img.clone())
+
 
 def rgb2yuv(image):
     img = image.transpose(2,0,1).reshape(3,-1)
@@ -86,22 +109,6 @@ class WithSavedActivations:
         return self.activations
 
 
-def lowres_noise_like(tens):
-    lowres_size = (
-            tens.shape[0],
-            tens.shape[1] // 8,
-            tens.shape[2] // 8)
-
-    canvas = torch.randn(*lowres_size) / 50 + 0.5
-    canvas = F.interpolate(
-            canvas[None],
-            size=tens.shape[1:],
-            mode='bilinear',
-            align_corners=False)[0].detach().cuda()
-    canvas.requires_grad = True
-    return canvas
-
-
 def npimg_to_tensor(np_img):
     return torch.FloatTensor(np_img / 255).permute(2, 0, 1).cuda()
 
@@ -123,8 +130,7 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
     grams = {layer_id: gram(layer_data).detach()
              for layer_id, layer_data in style_activations.items()}
 
-    canvas = torch_img.clone()#lowres_noise_like(torch_img)
-    canvas.requires_grad = True
+    canvas = get_parameterized_img(torch_img)
     del torch_img
     del torch_style
     del style_activations
@@ -134,13 +140,13 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
             for i, p in photo_activations.items()
             if i in content_layers}
 
-    opt = O.LBFGS([canvas], lr=0.5, history_size=10)
+    opt = O.LBFGS(canvas.parameters(), lr=0.5, history_size=10)
 
-    for i in range(30):
+    for i in range(50):
         def make_loss():
             gc.collect()
             opt.zero_grad()
-            input_img = torch.sigmoid(canvas[None])
+            input_img = canvas()
             activations = m(normalize(input_img), detach=False)
             style_loss = 0
             for j in ['0', '5', '10', '19', '28']:
@@ -153,7 +159,7 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
 
             loss = content_loss
             loss += style_ratio * style_loss
-            loss += tv_ratio * total_variation(canvas[None])
+            loss += tv_ratio * total_variation(input_img)
 
             loss.backward()
             return loss
@@ -162,7 +168,7 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
         if i % 10 == 0:
             print(i, loss.item())
 
-    return (255 * torch.sigmoid(canvas)
+    return (255 * canvas()[0]
             .cpu().detach().numpy().transpose(1, 2, 0)).astype('uint8')
 
 

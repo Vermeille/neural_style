@@ -29,7 +29,7 @@ except:
             self.img.requires_grad = True
 
         def __call__(self):
-            return self.img
+            return torch.sigmoid(self.img - 0.5)
 
         def parameters(self):
             return [self.img]

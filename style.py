@@ -39,21 +39,33 @@ except:
 
 
 def rgb2yuv(image):
-    img = image.transpose(2,0,1).reshape(3,-1)
-    luv = np.array([[.299, .587, .114],[-.147, -.288, .436],[.615, -.515, -.1]]).dot(img).reshape((3,image.shape[0],image.shape[1]))
-    return luv.transpose(1,2,0)
+    img = image.transpose(2,0,1).astype('int')    
+    Y = 0.299 * img[0] + 0.587 * img[1] + 0.114 * img[2]
+    u = (img[2] - Y) * 0.565
+    v = (img[0] - Y) * 0.713
+    luv = np.stack([Y, u, v], axis=0)
+    luv = np.clip(luv, 0, 255)
+    return luv.transpose(1,2,0).astype('uint8').copy()
 
 
 def rgb2lum(image):
-    img = image.transpose(2,0,1).reshape(3,-1)
-    luv = np.array([[.299, .587, .114]]).dot(img).reshape((1,image.shape[0],image.shape[1]))
-    return luv.transpose(1,2,0)
+    img = image.transpose(2,0,1).astype('int')    
+    Y = 0.299 * img[0] + 0.587 * img[1] + 0.114 * img[2]
+    lum = Y[None]
+    lum = np.clip(lum, 0, 255)
+    return lum.transpose(1,2,0).astype('uint8').copy()
 
 
 def yuv2rgb(image):
-    img = image.transpose(2,0,1).reshape(3,-1)
-    rgb = np.array([[1, 0, 1.139],[1, -.395, -.580],[1, 2.03, 0]]).dot(img).reshape((3,image.shape[0],image.shape[1]))
-    return rgb.transpose(1,2,0)
+    img = image.astype('float32')
+    img = img.transpose(2,0,1)
+    R = img[0] + 1.403 * img[2]
+    G = img[0] - 0.344 * img[1] - 0.714 * img[2]
+    B = img[0] + 1.77 * img[1]
+    rgb = np.stack([R, G, B], axis=0)
+    rgb = np.clip(rgb, 0, 255)
+    return rgb.transpose(1,2,0).astype('uint8').copy()
+
 
 
 def gram(m):

@@ -6,10 +6,21 @@ import functools
 from colors import ImageNetNormalize
 
 class PerceptualNet(nn.Module):
+    layer_names = [
+        'conv1_1', 'relu1_1', 'conv1_2', 'relu1_2', 'maxpool1',
+        'conv2_1', 'relu2_1', 'conv2_2', 'relu2_2', 'maxpool2',
+        'conv3_1', 'relu3_1', 'conv3_2', 'relu3_2', 'conv3_3', 'relu3_3',
+                'conv3_4', 'relu3_4', 'maxpool3',
+        'conv4_1', 'relu4_1', 'conv4_2', 'relu4_2', 'conv4_3', 'relu4_3',
+                'conv4_4', 'relu4_4', 'maxpool4',
+        'conv5_1', 'relu5_1', 'conv5_2', 'relu5_2', 'conv5_3', 'relu5_3',
+                'conv5_4', 'relu5_4', 'maxpool5'
+    ]
+
     def __init__(self, keep_layers):
         super(PerceptualNet, self).__init__()
         self.keep_layers = keep_layers
-        self.model = M.vgg19(pretrained=True).features[:max([int(x) for x in self.keep_layers])]
+        self.model = M.vgg19(pretrained=True).features
         self.activations = {}
         self.detach = True
 
@@ -22,10 +33,13 @@ class PerceptualNet(nn.Module):
 
 
         for name, layer in self.model.named_children():
-            if name in self.keep_layers:
-                layer.register_forward_hook(functools.partial(self._save, name))
+            idx = int(name)
             if isinstance(layer, nn.MaxPool2d):
-                self.model[int(name)] = nn.AvgPool2d(kernel_size=2, stride=2)
+                self.model[idx] = nn.AvgPool2d(kernel_size=2, stride=2)
+
+            pretty = PerceptualNet.layer_names[idx]
+            if pretty in self.keep_layers:
+                layer.register_forward_hook(functools.partial(self._save, pretty))
 
 
     def _save(self, name, module, input, output):
@@ -46,8 +60,8 @@ class PerceptualNet(nn.Module):
 class StyleLoss(nn.Module):
     def __init__(self):
         super(StyleLoss, self).__init__()
-        self.style_layers = ['0', '5', '10', '19', '28']
-        self.content_layers = ['21']
+        self.style_layers = ['relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1']
+        self.content_layers = ['relu3_2']
         self.normalize = ImageNetNormalize()
         self.net = PerceptualNet(self.style_layers + self.content_layers)
 

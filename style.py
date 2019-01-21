@@ -14,30 +14,8 @@ import io
 import argparse
 from perceptual import StyleLoss
 from colors import transfer_colors
-
-try:
-    import limpid.optvis.param as P
-    print('limpid detected')
-
-    def get_parameterized_img(*shape):
-        canvas = P.SpectralImage(shape)
-        canvas = P.DecorrelatedColors(canvas, sigmoid=True).cuda()
-        return canvas
-except:
-    class SimpleImg:
-        def __init__(self, img):
-            self.img = img[None]
-            self.img.requires_grad = True
-
-        def __call__(self):
-            return torch.sigmoid(self.img - 0.5)
-
-        def parameters(self):
-            return [self.img]
-
-    def get_parameterized_img(*shape):
-        return SimpleImg(torch.randn(*shape))
-
+from image import get_parameterized_img
+import cv2
 
 
 def npimg_to_tensor(np_img):

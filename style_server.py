@@ -1,7 +1,6 @@
 from flask import Flask, request
 import requests
 import style
-from torchvision import models as M
 import base64
 import io
 from PIL import Image
@@ -36,6 +35,11 @@ def img_to_data_url(img):
         return 'data:image/jpg;base64,' + base64.b64encode(f.read()).decode()
 
 
+def fname(f):
+    return os.path.basename(f).split('.')[0]
+
+
+stylizer = style.ArtisticStyleOptimizer(device='cuda')
 @app.route('/go', methods=['GET', 'POST'])
 def go():
     args = request.args

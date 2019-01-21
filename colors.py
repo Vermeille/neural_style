@@ -42,8 +42,9 @@ def transfer_colors(color_src, lum_src):
 class ImageNetNormalize(nn.Module):
     def __init__(self):
         super(ImageNetNormalize, self).__init__()
-        self.norm_mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-        self.norm_std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+        self.register_buffer('norm_mean', torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1))
+        self.register_buffer('norm_std', torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1))
+
 
     def forward(self, input):
         return (input - self.norm_mean) / self.norm_std

@@ -68,7 +68,8 @@ class StyleLoss(nn.Module):
     def set_style(self, style_img, style_ratio):
         self.ratio = style_ratio
 
-        activations = self.get_style_content_(style_img[None], detach=True)[0]
+        with torch.no_grad():
+            activations = self.get_style_content_(style_img[None], detach=True)[0]
 
         grams = {layer_id: StyleLoss.gram(layer_data)
                  for layer_id, layer_data in activations.items()}
@@ -77,7 +78,8 @@ class StyleLoss(nn.Module):
 
 
     def set_content(self, content_img):
-        acts = self.get_style_content_(content_img[None], detach=True)[1]
+        with torch.no_grad():
+            acts = self.get_style_content_(content_img[None], detach=True)[1]
         self.photo_activations = acts
 
 

@@ -44,14 +44,15 @@ def npimg_to_tensor(np_img):
     return transforms.ToTensor()(np_img)
 
 
-class ArtisticStyle:
+class ArtisticStyleOptimizer:
     def __init__(self, device="cpu"):
         self.loss = StyleLoss().to(device)
+        self.device = device
 
 
     def build_ref_acts(self, content_img, style_img, style_ratio):
-        self.loss.set_style(npimg_to_tensor(style_img), style_ratio)
-        self.loss.set_content(npimg_to_tensor(content_img))
+        self.loss.set_style(npimg_to_tensor(style_img).to(self.device), style_ratio)
+        self.loss.set_content(npimg_to_tensor(content_img).to(self.device))
 
 
     def optimize_img(self, canvas):
@@ -70,35 +71,33 @@ class ArtisticStyle:
             if i % 10 == 0:
                 print(i, loss.item())
 
-        return transforms.ToPILImage()(canvas()[0])
+        return transforms.ToPILImage()(canvas().cpu().detach()[0])
 
     def __call__(self, content_img, style_img, style_ratio):
         self.build_ref_acts(content_img, style_img, style_ratio)
-        canvas = get_parameterized_img(3, content_img.height, content_img.width)
+        canvas = get_parameterized_img(
+                3, content_img.height, content_img.width, backend='limpid').to(self.device)
         return self.optimize_img(canvas)
 
 
-def go(args):
-    style_scale = args.scale
-
+def go(args, stylizer):
     content = Image.open(args.content)
     content.thumbnail((args.size, args.size))
 
     style_img = Image.open(args.style)
-    if style_scale != 1.0:
+    if args.scale != 1.0:
         new_style_size = (
-                style_img.width * style_scale,
-                style_img.height * style_scale
+                int(style_img.width * args.scale),
+                int(style_img.height * args.scale)
         )
         style_img = style_img.resize(new_style_size, Image.BILINEAR)
 
-    stylizer = ArtisticStyle()
     result = stylizer(content, style_img, args.ratio)
 
     if args.preserve_colors == 'on':
         result = transfer_colors(content, result)
 
-    return result
+    result.save(args.out)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -110,8 +109,9 @@ if __name__ == '__main__':
     parser.add_argument('--scale', type=float, default=1)
     parser.add_argument('--ratio', default=1, type=float)
     parser.add_argument('--preserve_colors', default='off')
+    parser.add_argument('--device', default='cuda')
     args = parser.parse_args(sys.argv[1:])
 
-    result = go(args)
-    result.save(args.out)
+    stylizer = ArtisticStyleOptimizer(device=args.device)
+    go(args, stylizer)
 

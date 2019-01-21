@@ -13,6 +13,8 @@ import requests
 import torch.optim as O
 import io
 import argparse
+from perceptual import PerceptualNet
+from colors import rgb2yuv, rgb2yuv, yuv2rgb, ImageNetNormalize
 
 try:
     import limpid.optvis.param as P
@@ -38,35 +40,6 @@ except:
         return SimpleImg(torch_img.clone())
 
 
-def rgb2yuv(image):
-    img = image.transpose(2,0,1).astype('int')    
-    Y = 0.299 * img[0] + 0.587 * img[1] + 0.114 * img[2]
-    u = (img[2] - Y) * 0.565
-    v = (img[0] - Y) * 0.713
-    luv = np.stack([Y, u, v], axis=0)
-    luv = np.clip(luv, 0, 255)
-    return luv.transpose(1,2,0).astype('uint8').copy()
-
-
-def rgb2lum(image):
-    img = image.transpose(2,0,1).astype('int')    
-    Y = 0.299 * img[0] + 0.587 * img[1] + 0.114 * img[2]
-    lum = Y[None]
-    lum = np.clip(lum, 0, 255)
-    return lum.transpose(1,2,0).astype('uint8').copy()
-
-
-def yuv2rgb(image):
-    img = image.astype('float32')
-    img = img.transpose(2,0,1)
-    R = img[0] + 1.403 * img[2]
-    G = img[0] - 0.344 * img[1] - 0.714 * img[2]
-    B = img[0] + 1.77 * img[1]
-    rgb = np.stack([R, G, B], axis=0)
-    rgb = np.clip(rgb, 0, 255)
-    return rgb.transpose(1,2,0).astype('uint8').copy()
-
-
 
 def gram(m):
     b, c, h, w = m.shape
@@ -77,65 +50,19 @@ def gram(m):
     return g
 
 
-def total_variation(input):
-    diff_h = ((input[:, :, 1:, :] - input[:, :, :-1, :]) ** 2).mean()
-    diff_v = ((input[:, :, :, 1:] - input[:, :, :, :-1]) ** 2).mean()
-    return torch.sqrt(diff_h + diff_v)
-
-
-def normalize(input):
-    norm_mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).cuda()
-    norm_std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).cuda()
-    return (input - norm_mean) / norm_std
-
-
-class WithSavedActivations:
-    def __init__(self, model):
-        self.model = model
-        self.activations = {}
-        self.detach = True
-
-        # We want to save activations of convs and relus. Also, MaxPool creates
-        # actifacts so we replace them with AvgPool that makes things a bit
-        # cleaner.
-
-        for name, layer in self.model.named_children():
-            if isinstance(layer, nn.Conv2d):
-                layer.register_forward_hook(functools.partial(self._save, name))
-            if isinstance(layer, nn.ReLU):
-                self.model[int(name)] = nn.ReLU(inplace=False)
-            if isinstance(layer, nn.MaxPool2d):
-                self.model[int(name)] = nn.AvgPool2d(kernel_size=2, stride=2)
-
-
-    def _save(self, name, module, input, output):
-        if self.detach:
-            self.activations[name] = output.detach().clone()
-        else:
-            self.activations[name] = output.clone()
-
-    def __call__(self, input, detach):
-        self.detach = detach
-        self.activations = {}
-        self.model(input)
-        return self.activations
-
-
 def npimg_to_tensor(np_img):
-    return torch.FloatTensor(np_img / 255).permute(2, 0, 1).cuda()
+    return transforms.ToTensor()(np_img)
 
 
-def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10):
-    content_layers = ['21']
-    if m is None:
-        m = M.vgg19(pretrained=True).cuda().eval()
-        m = WithSavedActivations(m.features)
+def artistic_style(content_img, style_img, m=None, style_ratio=1e1):
+    normalize = ImageNetNormalize()
+    m = PerceptualNet()
 
     torch_img = npimg_to_tensor(content_img)
-    photo_activations = m(normalize(torch_img[None]), detach=True)
+    photo_activations = m(normalize(torch_img[None]), detach=True)[1]
 
     torch_style = npimg_to_tensor(style_img)
-    style_activations = m(normalize(torch_style[None]), detach=True)
+    style_activations = m(normalize(torch_style[None]), detach=True)[0]
 
     canvas = torch.randn_like(torch_img, requires_grad=True)
 
@@ -147,11 +74,6 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
     del torch_style
     del style_activations
 
-    photo_activations = {
-            i: p
-            for i, p in photo_activations.items()
-            if i in content_layers}
-
     opt = O.LBFGS(canvas.parameters(), lr=0.5, history_size=10)
 
     for i in range(50):
@@ -159,19 +81,18 @@ def artistic_style(content_img, style_img, m=None, style_ratio=1e1, tv_ratio=10)
             gc.collect()
             opt.zero_grad()
             input_img = canvas()
-            activations = m(normalize(input_img), detach=False)
+            style_acts, content_acts = m(normalize(input_img), detach=False)
             style_loss = 0
-            for j in ['0', '5', '10', '19', '28']:
-                style_loss += 0.2 * F.mse_loss(
-                        gram(activations[j]), grams[j], reduction='sum')
+            for j in style_acts:
+                style_loss += (1/len(style_acts)) * F.mse_loss(
+                        gram(style_acts[j]), grams[j], reduction='sum')
 
             content_loss = 0
-            for j in content_layers:
-                content_loss += F.mse_loss(activations[j], photo_activations[j])
+            for j in content_acts:
+                content_loss += F.mse_loss(content_acts[j], photo_activations[j])
 
             loss = content_loss
             loss += style_ratio * style_loss
-            loss += tv_ratio * total_variation(input_img)
 
             loss.backward()
             return loss
@@ -198,7 +119,7 @@ def go(args):
     content = open_img(args.content, content_scale)
     style_img = open_img(args.style, style_scale)
 
-    result = artistic_style(content, style_img, None, args.ratio, args.tv_ratio)
+    result = artistic_style(content, style_img, None, args.ratio)
 
     if args.preserve_colors == 'on':
         content_yuv = rgb2yuv(content)
@@ -215,8 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('--style', required=True)
     parser.add_argument('--out', required=True)
     parser.add_argument('--size', type=int)
-    parser.add_argument('--ratio', default=1e3, type=float)
-    parser.add_argument('--tv_ratio', default=10, type=float)
+    parser.add_argument('--ratio', default=1, type=float)
     parser.add_argument('--preserve_colors', default='off')
     args = parser.parse_args(sys.argv[1:])
 

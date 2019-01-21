@@ -4,32 +4,23 @@ import style
 import base64
 import io
 from PIL import Image
-import numpy as np
+from types import SimpleNamespace
+import time
+import os
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = '/tmp/'
 
-m = M.vgg19(pretrained=True).cuda().eval()
-m = style.WithSavedActivations(m.features)
-
-
-def wget(url, scale=None):
+def wget(url, nm):
     r = requests.get(url)
     print(r.status_code)
     with io.BytesIO(r.content) as f:
-        return open_img(f, scale)
-
-
-def open_img(path, size=None):
-    img = Image.open(path)
-    if size is not None:
-        img.thumbnail((size, size))
-    return np.array(img)
+        im = Image.open(f)
+        im.save(nm)
 
 
 def img_to_data_url(img):
     with io.BytesIO() as f:
-        img = Image.fromarray(img, 'RGB')
+        img = Image.open(img)
         img.save(f, 'jpeg')
         f.seek(0)
         return 'data:image/jpg;base64,' + base64.b64encode(f.read()).decode()
@@ -42,30 +33,31 @@ def fname(f):
 stylizer = style.ArtisticStyleOptimizer(device='cuda')
 @app.route('/go', methods=['GET', 'POST'])
 def go():
-    args = request.args
+    rargs = request.args
+    args = SimpleNamespace()
 
-    content_scale = int(args['size'])
-    style_scale = content_scale
+    args.size = int(rargs['size'])
+    args.scale = float(rargs['scale'])
+    args.ratio = float(rargs['ratio'])
+    args.preserve_colors = rargs.get('preserve_colors', 'off')
 
-    if args['content'].startswith('http'):
-        content = wget(args['content'], content_scale)
-    else:
-        content = open_img(args['content'], content_scale)
+    args.content = rargs['content']
+    if args.content.startswith('http'):
+        fn = 'content/' + str(int(time.time() * 100)) + '.png'
+        wget(args.content, fn)
+        args.content = fn
 
-    if args['style'].startswith('http'):
-        style_img = wget(args['style'], style_scale)
-    else:
-        style_img = open_img(args['style'], style_scale)
+    args.style = rargs['style']
+    if args.style.startswith('http'):
+        fn = 'style/' + str(int(time.time() * 100)) + '.png'
+        wget(args.style, fn)
+        args.style = fn
 
-    result = style.artistic_style(content, style_img, m,
-            float(args.get('ratio', '1e1')), float(args.get('tv_ratio', '10')))
+    args.out = 'result/' + fname(args.content) + '_' + fname(args.style) + '.png'
+    print(args.__dict__)
+    style.go(args, stylizer)
 
-    if args.get('preserve_colors', 'off') == 'on':
-        content_yuv = style.rgb2yuv(content)
-        result_lum = style.rgb2lum(result)
-        content_yuv[:, :, 0] = result_lum[:, :, 0]
-        result = style.yuv2rgb(content_yuv).astype('uint8')
-    return '<img src="' + img_to_data_url(result) +'" />'
+    return '<img src="' + img_to_data_url(args.out) +'" />'
 
 
 @app.route('/', methods=['GET'])
@@ -96,9 +88,9 @@ def index():
             <br/>
             <input
                 type="number"
-                name="tv_ratio"
-                placeholder="Total Variation ratio"
-                value="10"/>
+                name="scale"
+                placeholder="Style Scale"
+                value="1"/>
             <br/>
             Result size:
             <select name="size">
@@ -122,4 +114,10 @@ window.upload.onsubmit = (e) => {
     """
 
 if __name__ == '__main__':
+    try:
+        os.mkdir('content')
+        os.mkdir('style')
+        os.mkdir('result')
+    except:
+        pass
     app.run(host='0.0.0.0', port=8000)

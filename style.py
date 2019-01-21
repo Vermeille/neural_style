@@ -34,10 +34,9 @@ class ArtisticStyleOptimizer:
 
 
     def optimize_img(self, canvas):
-        #opt = O.LBFGS(canvas.parameters(), lr=0.5, history_size=10)
-        opt = O.Adam(canvas.parameters(), lr=0.5)
+        opt = O.LBFGS(canvas.parameters(), lr=0.3, history_size=10)
 
-        for i in range(100):
+        for i in range(15):
             def make_loss():
                 opt.zero_grad()
                 input_img = canvas()

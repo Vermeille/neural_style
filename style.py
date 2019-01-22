@@ -28,30 +28,37 @@ class ArtisticStyleOptimizer:
         self.device = device
 
 
-    def build_ref_acts(self, content_img, style_img, style_ratio):
+    def build_ref_acts(self, content_img, style_img, style_ratio, content_layers):
         self.loss.set_style(npimg_to_tensor(style_img).to(self.device), style_ratio)
-        self.loss.set_content(npimg_to_tensor(content_img).to(self.device))
+        self.loss.set_content(
+                npimg_to_tensor(content_img).to(self.device), content_layers)
 
 
     def optimize_img(self, canvas):
         opt = O.LBFGS(canvas.parameters(), lr=0.3, history_size=10)
 
-        for i in range(15):
+        prev_loss = None
+        for i in range(30):
             def make_loss():
                 opt.zero_grad()
                 input_img = canvas()
+                if True:
+                    cv2.imshow('prout',
+                            np.array(transforms.ToPILImage()(input_img[0].detach().cpu()))[:, :, ::-1])
+                    cv2.waitKey(1)
                 loss = self.loss(input_img)
                 loss.backward()
                 return loss
 
-            loss = opt.step(make_loss)
-            if i % 10 == 0:
-                print(i, loss.item())
-
+            loss = opt.step(make_loss).item()
+            if prev_loss is not None and loss > prev_loss * 0.95:
+                break
+            prev_loss = loss
+                
         return transforms.ToPILImage()(canvas().cpu().detach()[0])
 
-    def __call__(self, content_img, style_img, style_ratio):
-        self.build_ref_acts(content_img, style_img, style_ratio)
+    def __call__(self, content_img, style_img, style_ratio, content_layers=None):
+        self.build_ref_acts(content_img, style_img, style_ratio, content_layers)
         canvas = get_parameterized_img(
                 3, content_img.height, content_img.width, backend='limpid').to(self.device)
         return self.optimize_img(canvas)
@@ -69,7 +76,7 @@ def go(args, stylizer):
         )
         style_img = style_img.resize(new_style_size, Image.BILINEAR)
 
-    result = stylizer(content, style_img, args.ratio)
+    result = stylizer(content, style_img, args.ratio, args.content_layers)
 
     if args.preserve_colors == 'on':
         result = transfer_colors(content, result)
@@ -87,8 +94,10 @@ if __name__ == '__main__':
     parser.add_argument('--ratio', default=1, type=float)
     parser.add_argument('--preserve_colors', default='off')
     parser.add_argument('--device', default='cuda')
+    parser.add_argument('--content_layers', default=None)
     args = parser.parse_args(sys.argv[1:])
 
+    args.content_layers = args.content_layers and args.content_layers.split(',')
     stylizer = ArtisticStyleOptimizer(device=args.device)
     go(args, stylizer)
 

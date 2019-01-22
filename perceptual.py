@@ -19,9 +19,9 @@ class PerceptualNet(nn.Module):
 
     def __init__(self, keep_layers):
         super(PerceptualNet, self).__init__()
-        self.keep_layers = keep_layers
         self.model = M.vgg19(pretrained=True).features
         self.activations = {}
+        self.hooks = []
         self.detach = True
 
         # We want to save activations of convs and relus. Also, MaxPool creates
@@ -37,8 +37,18 @@ class PerceptualNet(nn.Module):
             if isinstance(layer, nn.MaxPool2d):
                 self.model[idx] = nn.AvgPool2d(kernel_size=2, stride=2)
 
+        self.set_keep_layers(keep_layers)
+
+
+    def set_keep_layers(self, keep_layers):
+        for hook in self.hooks:
+            hook.remove()
+        self.hooks = []
+
+        for name, layer in self.model.named_children():
+            idx = int(name)
             pretty = PerceptualNet.layer_names[idx]
-            if pretty in self.keep_layers:
+            if pretty in keep_layers:
                 layer.register_forward_hook(functools.partial(self._save, pretty))
 
 
@@ -60,7 +70,8 @@ class PerceptualNet(nn.Module):
 class StyleLoss(nn.Module):
     def __init__(self):
         super(StyleLoss, self).__init__()
-        self.style_layers = ['relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1']
+        self.style_layers = [
+                'relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1']
         self.content_layers = ['relu3_2']
         self.normalize = ImageNetNormalize()
         self.net = PerceptualNet(self.style_layers + self.content_layers)
@@ -79,8 +90,12 @@ class StyleLoss(nn.Module):
         return style, content
 
 
-    def set_style(self, style_img, style_ratio):
+    def set_style(self, style_img, style_ratio, style_layers=None):
         self.ratio = style_ratio
+
+        if style_layers is not None:
+            self.style_layers = style_layers
+            self.net.set_keep_layers(self.style_layers + self.content_layers)
 
         with torch.no_grad():
             activations = self.get_style_content_(style_img[None], detach=True)[0]
@@ -91,7 +106,11 @@ class StyleLoss(nn.Module):
         self.style_grams = grams
 
 
-    def set_content(self, content_img):
+    def set_content(self, content_img, content_layers=None):
+        if content_layers is not None:
+            self.content_layers = content_layers
+            self.net.set_keep_layers(self.style_layers + self.content_layers)
+
         with torch.no_grad():
             acts = self.get_style_content_(content_img[None], detach=True)[1]
         self.photo_activations = acts

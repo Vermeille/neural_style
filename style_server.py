@@ -39,6 +39,7 @@ def go():
     args.size = int(rargs['size'])
     args.scale = float(rargs['scale'])
     args.ratio = float(rargs['ratio'])
+    args.content_layers = [rargs['content_layer']]
     args.preserve_colors = rargs.get('preserve_colors', 'off')
 
     args.content = rargs['content']
@@ -92,6 +93,13 @@ def index():
                 placeholder="Style Scale"
                 value="1"/>
             <br/>
+            Content shape fidelity:
+            <select name="content_layer">
+                <option value="relu3_2">high</option>
+                <option value="relu4_2">medium</option>
+                <option value="relu5_2">low</option>
+            </select>
+
             Result size:
             <select name="size">
                 <option value="128">128px</option>

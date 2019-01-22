@@ -1,16 +1,9 @@
+import readline
 import sys
 import numpy as np
-import math
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torchvision import models as M
 from torchvision import transforms
-import functools
 from PIL import Image
-import requests
 import torch.optim as O
-import io
 import argparse
 from perceptual import StyleLoss
 from colors import transfer_colors
@@ -38,7 +31,7 @@ class ArtisticStyleOptimizer:
         opt = O.LBFGS(canvas.parameters(), lr=0.3, history_size=10)
 
         prev_loss = None
-        for i in range(30):
+        for i in range(100):
             def make_loss():
                 opt.zero_grad()
                 input_img = canvas()
@@ -92,12 +85,26 @@ if __name__ == '__main__':
     parser.add_argument('--size', type=int)
     parser.add_argument('--scale', type=float, default=1)
     parser.add_argument('--ratio', default=1, type=float)
-    parser.add_argument('--preserve_colors', default='off')
+    parser.add_argument('--preserve_colors', action='store_true')
     parser.add_argument('--device', default='cuda')
-    parser.add_argument('--content_layers', default=None)
+    parser.add_argument('--content_layers', default=None,
+            type=lambda x: x and x.split(','))
+    parser.add_argument('--interactive', action='store_true')
     args = parser.parse_args(sys.argv[1:])
 
-    args.content_layers = args.content_layers and args.content_layers.split(',')
     stylizer = ArtisticStyleOptimizer(device=args.device)
     go(args, stylizer)
+    if args.interactive:
+        while True:
+            try:
+                cmd = input('> ')
+            except:
+                break
+            try:
+                go(parser.parse_args(cmd.split()), stylizer)
+            except KeyboardInterrupt:
+                pass
+            except Exception as e:
+                print(str(e))
+                pass
 

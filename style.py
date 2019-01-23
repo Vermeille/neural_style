@@ -5,7 +5,7 @@ from torchvision import transforms
 from PIL import Image
 import torch.optim as O
 import argparse
-from perceptual import StyleLoss
+from loss import StyleLoss
 from colors import transfer_colors
 from image import get_parameterized_img
 import cv2
@@ -28,7 +28,7 @@ class ArtisticStyleOptimizer:
 
 
     def optimize_img(self, canvas):
-        opt = O.LBFGS(canvas.parameters(), lr=0.3, history_size=10)
+        opt = O.LBFGS(canvas.parameters(), lr=0.2, history_size=10)
 
         prev_loss = None
         for i in range(100):

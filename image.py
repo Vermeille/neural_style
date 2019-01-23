@@ -16,7 +16,7 @@ try:
 
     def get_parameterized_img(*shape, backend='limpid'):
         if backend == 'limpid':
-            canvas = P.SpectralImage(shape)
+            canvas = P.SpectralImage(shape, 0.05)
             canvas = P.DecorrelatedColors(canvas, sigmoid=True)
             return canvas
         else:

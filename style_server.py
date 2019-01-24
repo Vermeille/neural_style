@@ -9,13 +9,7 @@ import time
 import os
 
 app = Flask(__name__)
-
-def wget(url, nm):
-    r = requests.get(url)
-    print(r.status_code)
-    with io.BytesIO(r.content) as f:
-        im = Image.open(f)
-        im.save(nm)
+app.config['UPLOAD_FOLDER'] = '.'
 
 
 def img_to_data_url(img):
@@ -33,29 +27,24 @@ def fname(f):
 stylizer = style.ArtisticStyleOptimizer(device='cuda')
 @app.route('/go', methods=['GET', 'POST'])
 def go():
-    rargs = request.args
+    rargs = request.form
     args = SimpleNamespace()
 
     args.size = int(rargs['size'])
     args.scale = float(rargs['scale'])
     args.ratio = float(rargs['ratio'])
     args.content_layers = [rargs['content_layer']]
-    args.preserve_colors = rargs.get('preserve_colors', 'off')
+    args.preserve_colors = rargs.get('preserve_colors', 'off') == 'on'
 
-    args.content = rargs['content']
-    if args.content.startswith('http'):
-        fn = 'content/' + str(int(time.time() * 100)) + '.png'
-        wget(args.content, fn)
-        args.content = fn
+    fn = 'content/' + str(int(time.time() * 100)) + '.png'
+    request.files['content'].save(fn)
+    args.content = fn
 
-    args.style = rargs['style']
-    if args.style.startswith('http'):
-        fn = 'style/' + str(int(time.time() * 100)) + '.png'
-        wget(args.style, fn)
-        args.style = fn
+    fn = 'style/' + str(int(time.time() * 100)) + '.png'
+    request.files['style'].save(fn)
+    args.style = fn
 
     args.out = 'result/' + fname(args.content) + '_' + fname(args.style) + '.png'
-    print(args.__dict__)
     style.go(args, stylizer)
 
     return '<img src="' + img_to_data_url(args.out) +'" />'
@@ -66,17 +55,23 @@ def index():
     return """
 <!doctype html>
 <html>
+    <head>
+        <link href="https://unpkg.com/filepond/dist/filepond.css" rel="stylesheet">
+    </head>
     <body>
+        <script src="https://unpkg.com/filepond/dist/filepond.js"></script>
         <h1>Neural Style</h1>
-        <form id="upload" action="/go" method="GET">
+        <form id="upload" action="/go" method="POST" enctype="multipart/form-data">
             <input
-                type="text"
+                type="file"
+                class="filepond"
                 name="content"
                 placeholder="content URL"
                 required/>
             <br/>
             <input
-                type="text"
+                type="file"
+                class="filepond"
                 name="style"
                 placeholder="style URL"
                 required/>
@@ -85,7 +80,7 @@ def index():
                 type="number"
                 name="ratio"
                 placeholder="Loss ratio"
-                value="10"/>
+                value="300"/>
             <br/>
             <input
                 type="number"
@@ -113,6 +108,9 @@ def index():
             <br/>
             <input type="submit"/>
         </form>
+        <script>
+            FilePond.parse(document.body);
+        </script>
     </body>
     <script>
 window.upload.onsubmit = (e) => {

@@ -8,8 +8,8 @@ class StyleLoss(nn.Module):
     def __init__(self):
         super(StyleLoss, self).__init__()
         self.style_layers = [
-                'relu1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1']
-        self.content_layers = ['relu3_2']
+                'conv1_1', 'relu2_1', 'relu3_1', 'relu4_1', 'relu5_1']
+        self.content_layers = ['conv3_2']
         self.normalize = ImageNetNormalize()
         self.net = PerceptualNet(self.style_layers + self.content_layers)
 

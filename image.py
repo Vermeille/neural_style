@@ -4,23 +4,31 @@ import torch.nn as nn
 class SimpleImg(nn.Module):
     def __init__(self, *shape):
         super(SimpleImg, self).__init__()
-        self.img = nn.Parameter(torch.randn(1, *shape) * 0.02)
+        self.img = nn.Parameter(torch.randn(1, *shape) * 0.04)
 
     def __call__(self):
-        return torch.sigmoid(self.img - 0.5)
+        return self.img
 
 
 try:
     import limpid.optvis.param as P
     print('limpid detected')
+    class Clamp(nn.Module):
+        def __init__(self, canvas):
+            super(Clamp, self).__init__()
+            self.canvas = canvas
+
+        def forward(self):
+            return self.canvas().clamp(-1, 1) / 2 + 0.5
 
     def get_parameterized_img(*shape, backend='limpid'):
         if backend == 'limpid':
-            canvas = P.SpectralImage(shape, 0.05)
-            canvas = P.DecorrelatedColors(canvas, sigmoid=True)
+            canvas = P.SpectralImage(shape, 0.01, 0.6)
+            #canvas = P.DecorrelatedColors(canvas, sigmoid=False)
+            canvas = Clamp(canvas)
             return canvas
         else:
-            return SimpleImg(*shape)
+            return Clamp(SimpleImg(*shape))
 except:
     def get_parameterized_img(*shape, backend='pixel'):
         assert backend != 'limpid', "Limpid ain't detected"

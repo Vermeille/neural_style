@@ -67,11 +67,11 @@ def go(args, stylizer):
                 int(style_img.width * args.scale),
                 int(style_img.height * args.scale)
         )
-        style_img = style_img.resize(new_style_size, Image.BILINEAR)
+        style_img = style_img.resize(new_style_size, Image.BICUBIC)
 
     result = stylizer(content, style_img, args.ratio, args.content_layers)
 
-    if args.preserve_colors == 'on':
+    if args.preserve_colors:
         result = transfer_colors(content, result)
 
     result.save(args.out)

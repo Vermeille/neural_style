@@ -8,7 +8,7 @@ import argparse
 from loss import StyleLoss
 from colors import transfer_colors
 from image import get_parameterized_img
-import cv2
+import torch
 
 
 def npimg_to_tensor(np_img):
@@ -27,18 +27,21 @@ class ArtisticStyleOptimizer:
                 npimg_to_tensor(content_img).to(self.device), content_layers)
 
 
+    def __call__(self, content_img, style_img, style_ratio, content_layers=None):
+        self.build_ref_acts(content_img, style_img, style_ratio, content_layers)
+        canvas = get_parameterized_img(
+                3, content_img.height, content_img.width, backend='limpid').to(self.device)
+        return self.optimize_img(canvas)
+
+
     def optimize_img(self, canvas):
-        opt = O.LBFGS(canvas.parameters(), lr=0.2, history_size=10)
+        opt = O.LBFGS(canvas.parameters(), lr=0.2, history_size=20)
 
         prev_loss = None
         for i in range(100):
             def make_loss():
                 opt.zero_grad()
                 input_img = canvas()
-                if True:
-                    cv2.imshow('prout',
-                            np.array(transforms.ToPILImage()(input_img[0].detach().cpu()))[:, :, ::-1])
-                    cv2.waitKey(1)
                 loss = self.loss(input_img)
                 loss.backward()
                 return loss
@@ -49,12 +52,6 @@ class ArtisticStyleOptimizer:
             prev_loss = loss
                 
         return transforms.ToPILImage()(canvas().cpu().detach()[0])
-
-    def __call__(self, content_img, style_img, style_ratio, content_layers=None):
-        self.build_ref_acts(content_img, style_img, style_ratio, content_layers)
-        canvas = get_parameterized_img(
-                3, content_img.height, content_img.width, backend='limpid').to(self.device)
-        return self.optimize_img(canvas)
 
 
 def go(args, stylizer):

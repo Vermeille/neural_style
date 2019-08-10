@@ -30,21 +30,25 @@ def go():
     rargs = request.form
     args = SimpleNamespace()
 
+    print(request.form)
+    print(request.files)
     args.size = int(rargs['size'])
     args.scale = float(rargs['scale'])
     args.ratio = float(rargs['ratio'])
     args.content_layers = [rargs['content_layer']]
     args.preserve_colors = rargs.get('preserve_colors', 'off') == 'on'
 
-    fn = 'content/' + str(int(time.time() * 100)) + '.png'
+    print('SAVING')
+    fn = 'content/' + str(int(time.time() * 100)) + '.jpg'
     request.files['content'].save(fn)
     args.content = fn
 
-    fn = 'style/' + str(int(time.time() * 100)) + '.png'
+    fn = 'style/' + str(int(time.time() * 100)) + '.jpg'
     request.files['style'].save(fn)
     args.style = fn
 
     args.out = 'result/' + fname(args.content) + '_' + fname(args.style) + '.png'
+    print('BEFORE')
     style.go(args, stylizer)
 
     return '<img src="' + img_to_data_url(args.out) +'" />'
@@ -64,14 +68,12 @@ def index():
         <form id="upload" action="/go" method="POST" enctype="multipart/form-data">
             <input
                 type="file"
-                class="filepond"
                 name="content"
                 placeholder="content URL"
                 required/>
             <br/>
             <input
                 type="file"
-                class="filepond"
                 name="style"
                 placeholder="style URL"
                 required/>
@@ -84,6 +86,7 @@ def index():
             <br/>
             <input
                 type="number"
+                step="any"
                 name="scale"
                 placeholder="Style Scale"
                 value="1"/>

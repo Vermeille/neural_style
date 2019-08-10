@@ -1,3 +1,5 @@
 torch
 torchvision
 flask
+git+git://github.com/vermeille/limpid
+git+git://github.com/vermeille/torchelie

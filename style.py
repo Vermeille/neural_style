@@ -5,7 +5,7 @@ from torchvision import transforms
 from PIL import Image
 import torch.optim as O
 import argparse
-from loss import StyleLoss
+from torchelie.loss import NeuralStyleLoss
 from colors import transfer_colors
 from image import get_parameterized_img
 import torch
@@ -17,7 +17,7 @@ def npimg_to_tensor(np_img):
 
 class ArtisticStyleOptimizer:
     def __init__(self, device="cpu"):
-        self.loss = StyleLoss().to(device)
+        self.loss = NeuralStyleLoss().to(device)
         self.device = device
 
 

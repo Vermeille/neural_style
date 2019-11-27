@@ -5,7 +5,7 @@ from torchvision import transforms
 from PIL import Image
 import torch.optim as O
 import argparse
-from torchelie.recipes.neural_style import NeuralStyleRecipe
+from torchelie.recipes.neural_style import NeuralStyle
 from colors import transfer_colors
 import torch
 
@@ -22,7 +22,8 @@ def go(args, stylizer):
         )
         style_img = style_img.resize(new_style_size, Image.BICUBIC)
 
-    result = stylizer(content, style_img, args.ratio, args.content_layers)
+    result = stylizer.fit(500, content, style_img, args.ratio,
+            args.content_layers)
 
     if args.preserve_colors:
         result = transfer_colors(content, result)
@@ -45,7 +46,7 @@ if __name__ == '__main__':
     parser.add_argument('--interactive', action='store_true')
     args = parser.parse_args(sys.argv[1:])
 
-    stylizer = NeuralStyleRecipe(device=args.device)
+    stylizer = NeuralStyle(device=args.device)
     go(args, stylizer)
     if args.interactive:
         while True:

@@ -1,12 +1,14 @@
 from flask import Flask, request
-import requests
 import style
+import requests
 import base64
 import io
 from PIL import Image
 from types import SimpleNamespace
 import time
 import os
+
+from torchelie.recipes.neural_style import NeuralStyle
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = '.'
@@ -24,7 +26,7 @@ def fname(f):
     return os.path.basename(f).split('.')[0]
 
 
-stylizer = style.ArtisticStyleOptimizer(device='cuda')
+stylizer = NeuralStyle(device='cuda', visdom_env='style')
 @app.route('/go', methods=['GET', 'POST'])
 def go():
     rargs = request.form
@@ -93,9 +95,9 @@ def index():
             <br/>
             Content shape fidelity:
             <select name="content_layer">
-                <option value="relu3_2">high</option>
-                <option value="relu4_2">medium</option>
-                <option value="relu5_2">low</option>
+                <option value="conv3_2">high</option>
+                <option value="conv4_2">medium</option>
+                <option value="conv5_2">low</option>
             </select>
 
             Result size:

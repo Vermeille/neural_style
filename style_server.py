@@ -26,7 +26,7 @@ def fname(f):
     return os.path.basename(f).split('.')[0]
 
 
-stylizer = NeuralStyle(device='cuda', visdom_env='style')
+stylizer = NeuralStyle(device='cuda', visdom_env='style', lr=5e-2)
 @app.route('/go', methods=['GET', 'POST'])
 def go():
     rargs = request.form
@@ -81,10 +81,10 @@ def index():
                 required/>
             <br/>
             <input
-                type="number"
+                type="text"
                 name="ratio"
                 placeholder="Loss ratio"
-                value="300"/>
+                value="0.1"/>
             <br/>
             <input
                 type="number"
@@ -107,6 +107,8 @@ def index():
                 <option value="512">512px</option>
                 <option value="720">720px</option>
                 <option value="1024">1024px</option>
+                <option value="1366">1366px</option>
+                <option value="2048">2048px</option>
             </select>
             <br/>
             Preserve Colors <input type="checkbox" name="preserve_colors" />

@@ -11,10 +11,10 @@ import torch
 
 
 def go(args, stylizer):
-    content = Image.open(args.content)
+    content = Image.open(args.content).convert('RGB')
     content.thumbnail((args.size, args.size))
 
-    style_img = Image.open(args.style)
+    style_img = Image.open(args.style).convert('RGB')
     if args.scale != 1.0:
         new_style_size = (
                 int(style_img.width * args.scale),
@@ -22,13 +22,13 @@ def go(args, stylizer):
         )
         style_img = style_img.resize(new_style_size, Image.BICUBIC)
 
-    result = stylizer.fit(500, content, style_img, args.ratio,
+    result = stylizer.fit(3000, content, style_img, args.ratio,
             args.content_layers)
 
     if args.preserve_colors:
         result = transfer_colors(content, result)
 
-    result.save(args.out)
+    transforms.functional.to_pil_image(result).save(args.out)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

@@ -26,7 +26,9 @@ def fname(f):
     return os.path.basename(f).split('.')[0]
 
 
-stylizer = NeuralStyle(device='cuda', visdom_env='style', lr=5e-2)
+stylizer = NeuralStyle(device='cuda', visdom_env='style')
+
+
 @app.route('/go', methods=['GET', 'POST'])
 def go():
     rargs = request.form
@@ -39,6 +41,8 @@ def go():
     args.ratio = float(rargs['ratio'])
     args.content_layers = [rargs['content_layer']]
     args.preserve_colors = rargs.get('preserve_colors', 'off') == 'on'
+    args.init_with_content = rargs.get('init_with_content', 'off') == 'on'
+    args.coarse = float(rargs.get('coarse', '0'))
 
     print('SAVING')
     fn = 'content/' + str(int(time.time() * 100)) + '.jpg'
@@ -49,11 +53,15 @@ def go():
     request.files['style'].save(fn)
     args.style = fn
 
-    args.out = 'result/' + fname(args.content) + '_' + fname(args.style) + '.png'
+    args.out = 'result/' + fname(args.content) + '_' + fname(
+        args.style) + '.png'
     print('BEFORE')
-    style.go(args, stylizer)
+    try:
+        style.go(args, stylizer)
+    except KeyboardInterrupt:
+        print('interrupted')
 
-    return '<img src="' + img_to_data_url(args.out) +'" />'
+    return '<img src="' + img_to_data_url(args.out) + '" />'
 
 
 @app.route('/', methods=['GET'])
@@ -80,17 +88,26 @@ def index():
                 placeholder="style URL"
                 required/>
             <br/>
+            style ratio (bigger means more style, in [0, 1]):<br/>
             <input
                 type="text"
                 name="ratio"
                 placeholder="Loss ratio"
-                value="0.1"/>
+                value="0.97"/>
             <br/>
             <input
                 type="number"
                 step="any"
                 name="scale"
                 placeholder="Style Scale"
+                value="1"/>
+            <br/>
+            Coarse structures importance
+            <input
+                type="number"
+                step="any"
+                name="coarse"
+                placeholder="coarse structure importance"
                 value="1"/>
             <br/>
             Content shape fidelity:
@@ -109,10 +126,12 @@ def index():
                 <option value="1024">1024px</option>
                 <option value="1366">1366px</option>
                 <option value="2048">2048px</option>
+                <option value="-1">input size</option>
             </select>
             <br/>
             Preserve Colors <input type="checkbox" name="preserve_colors" />
             <br/>
+            Init with content<input type="checkbox" name="init_with_content" />
             <input type="submit"/>
         </form>
         <script>
@@ -125,6 +144,7 @@ window.upload.onsubmit = (e) => {
     </script>
 </html>
     """
+
 
 if __name__ == '__main__':
     try:
